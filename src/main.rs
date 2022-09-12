@@ -65,6 +65,7 @@ mod server;
 mod sharding;
 mod stats;
 mod tls;
+mod query_filter;
 
 use crate::config::{get_config, reload_config, VERSION};
 use crate::errors::Error;

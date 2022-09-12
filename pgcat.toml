@@ -133,6 +133,17 @@ query_parser_enabled = true
 primary_reads_enabled = true
 sharding_function = "pg_bigint_hash"
 
+[pools.simple_db.query_filter]
+allowed_queries = ["select 1;"]
+
+[pools.simple_db.query_filter.log_censored]
+file = "censored.log"
+normalized=true
+
+[pools.simple_db.query_filter.log_allowed]
+file = "allowed.log"
+normalized=true
+
 [pools.simple_db.users.0]
 username = "simple_user"
 password = "simple_user"

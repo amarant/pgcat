@@ -1,6 +1,7 @@
 FROM rust:1 AS builder
 COPY . /app
 WORKDIR /app
+RUN apt-get update && apt-get install -y cmake libclang-dev
 RUN cargo build --release
 
 FROM debian:bullseye-slim

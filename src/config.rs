@@ -187,6 +187,7 @@ pub struct Pool {
     pub sharding_function: String,
     pub shards: HashMap<String, Shard>,
     pub users: HashMap<String, User>,
+    pub query_filter: Option<QueryFilterConfig>
 }
 impl Default for Pool {
     fn default() -> Pool {
@@ -198,6 +199,7 @@ impl Default for Pool {
             query_parser_enabled: false,
             primary_reads_enabled: true,
             sharding_function: "pg_bigint_hash".to_string(),
+            query_filter: None,
         }
     }
 }
@@ -214,6 +216,46 @@ impl Default for Shard {
         Shard {
             servers: vec![(String::from("localhost"), 5432, String::from("primary"))],
             database: String::from("postgres"),
+        }
+    }
+}
+
+// pub enum QueryComparison {
+//     Fingerprint,
+//     Normalize,
+//     Exact
+// }
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct LogFilter {
+    pub file: String,
+    pub normalized: Option<bool>,
+}
+
+impl Default for LogFilter {
+    fn default() -> Self {
+        LogFilter {
+            file: String::from("query.log"),
+            normalized: Some(true),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct QueryFilterConfig{
+    pub allowed_queries: Option<Vec<String>>,
+    // pub compare : Option<QueryComparison>,
+    pub log_censored: Option<LogFilter>,
+    pub log_allowed: Option<LogFilter>,
+}
+
+impl Default for QueryFilterConfig {
+    fn default() -> Self {
+        QueryFilterConfig {
+            allowed_queries: None,
+            // compare: Some(QueryComparison::Fingerprint),
+            log_censored: None,
+            log_allowed: None,
         }
     }
 }
@@ -241,6 +283,7 @@ pub struct Config {
 
     pub general: General,
     pub pools: HashMap<String, Pool>,
+
 }
 
 impl Default for Config {

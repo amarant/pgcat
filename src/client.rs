@@ -19,6 +19,7 @@ use crate::stats::{get_reporter, Reporter};
 use crate::tls::Tls;
 
 use tokio_rustls::server::TlsStream;
+use crate::query_filter::QueryFilter;
 
 /// Type of connection received from client.
 enum ClientConnectionType {
@@ -88,6 +89,8 @@ pub struct Client<S, T> {
 
     /// Used to notify clients about an impending shutdown
     shutdown: Receiver<()>,
+
+    query_filter: Option<QueryFilter>,
 }
 
 /// Client entrypoint.
@@ -374,6 +377,7 @@ where
             None => "pgcat",
         };
 
+
         let admin = ["pgcat", "pgbouncer"]
             .iter()
             .filter(|db| *db == &pool_name)
@@ -476,6 +480,17 @@ where
             (transaction_mode, pool.server_info())
         };
 
+        let query_filter = config.pools
+            .get(pool_name)
+            .map(|p| p.query_filter.clone())
+            .flatten()
+            .map(|f| QueryFilter::new(f))
+            .transpose()?;
+
+        if query_filter.is_none() {
+            debug!("no query filtering");
+        }
+
         debug!("Password authentication successful");
 
         auth_ok(&mut write).await?;
@@ -505,6 +520,7 @@ where
             application_name: application_name.to_string(),
             shutdown,
             connected_to_server: false,
+            query_filter
         });
     }
 
@@ -539,6 +555,7 @@ where
             application_name: String::from("undefined"),
             shutdown,
             connected_to_server: false,
+            query_filter: None
         });
     }
 
@@ -823,11 +840,21 @@ where
                 match code {
                     // ReadyForQuery
                     'Q' => {
-                        debug!("Sending query to server");
 
-                        self.send_and_receive_loop(code, original, server, &address, &pool)
-                            .await?;
+                        debug!("filtering query to server");
 
+                        let allow = self.query_filter.as_mut()
+                            .map(|f| f.allow(original.clone()))
+                            .unwrap_or(true);
+
+                        if !allow {
+                            debug!("censor query to server");
+                            error_response(&mut self.write, &format!("censored query, try harder !")).await?;
+                        } else {
+                            debug!("Sending query to server");
+                            self.send_and_receive_loop(code, original, server, &address, &pool)
+                                .await?;
+                        }
                         if !server.in_transaction() {
                             // Report transaction executed statistics.
                             self.stats.transaction(self.process_id, address.id);
